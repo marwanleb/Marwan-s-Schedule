@@ -255,24 +255,29 @@ function stepper(value, fmt, onSet, step) {
 
 function timeEditor(rule, onSet) {
   const wrap = el("div", "timeEdit");
-  const shift = (hhmm, mins) => {
-    const [h, m] = hhmm.split(":").map(Number);
-    let t = h * 60 + m + mins;
-    t = ((t % 1440) + 1440) % 1440;
-    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  // Minutes from midnight, reading an end of 00:00 as the midnight after the
+  // start (1440), as the backend does. Steps used to wrap round the clock, so
+  // stretching an 11pm-12am block saved an end of 12:30am -- before its start --
+  // and the rule vanished.
+  const toMin = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmt = (t) => (t === 1440 ? "00:00" : `${pad(Math.floor(t / 60))}:${pad(t % 60)}`);
+  const start = toMin(rule.start_time);
+  const end = toMin(rule.end_time) === 0 && start > 0 ? 1440 : toMin(rule.end_time);
+  // A block stays inside its day; a step that would cross midnight does nothing.
+  const set = (s, e) => {
+    if (s < 0 || e > 1440 || e <= s || (s === start && e === end)) return;
+    onSet(fmt(s), fmt(e));
   };
   const label = el("span", "sval", rangeHHMM(rule.start_time, rule.end_time));
   const earlier = el("button", "sbtn", "−");
   const later = el("button", "sbtn", "+");
   const shorter = el("button", "sbtn", "−LEN");
   const longer = el("button", "sbtn", "+LEN");
-  earlier.onclick = () => onSet(shift(rule.start_time, -30), shift(rule.end_time, -30));
-  later.onclick = () => onSet(shift(rule.start_time, 30), shift(rule.end_time, 30));
-  shorter.onclick = () => {
-    const end = shift(rule.end_time, -30);
-    if (end > rule.start_time) onSet(rule.start_time, end);
-  };
-  longer.onclick = () => onSet(rule.start_time, shift(rule.end_time, 30));
+  earlier.onclick = () => set(start - 30, end - 30);
+  later.onclick = () => set(start + 30, end + 30);
+  shorter.onclick = () => set(start, end - 30);
+  longer.onclick = () => set(start, Math.min(end + 30, 1440));
   wrap.append(earlier, label, later, shorter, longer);
   return wrap;
 }

@@ -121,15 +121,42 @@ struct Landed {
 /// renders "01:30-01:30"; resolving both ends literally renders correctly but
 /// makes a one-hour class occupy two. Choosing the *pair* whose elapsed time
 /// matches what was written gets both.
+/// A block that runs up to midnight is written with an end of 00:00, and that
+/// midnight is the one *after* the start -- the end of the day, not its
+/// beginning. `true` when a span ends that way.
+pub(crate) fn ends_at_midnight(start: NaiveTime, end: NaiveTime) -> bool {
+    end == NaiveTime::MIN && start != NaiveTime::MIN
+}
+
+/// A span's length, reading an end of midnight as the end of the day.
+pub(crate) fn span_length(start: NaiveTime, end: NaiveTime) -> Duration {
+    if ends_at_midnight(start, end) {
+        Duration::days(1) - (start - NaiveTime::MIN)
+    } else {
+        end - start
+    }
+}
+
+/// `start + length`, but no later than midnight at the end of that day. A
+/// default length must not wrap round to the small hours of the same date:
+/// 11:30pm plus an hour used to become 12:30am *that morning*, before the
+/// start, and the block was dropped.
+pub(crate) fn end_within_day(start: NaiveTime, length: Duration) -> NaiveTime {
+    let room = Duration::days(1) - (start - NaiveTime::MIN);
+    if length >= room { NaiveTime::MIN } else { start + length }
+}
+
 fn place(
     zone: Tz,
     date: NaiveDate,
     start: NaiveTime,
     end: NaiveTime,
 ) -> Option<Landed> {
-    let written = end - start;
+    let written = span_length(start, end);
     let starts = candidates(zone, date, start);
-    let ends = candidates(zone, date, end);
+    // A block that runs up to midnight ends on the next date.
+    let end_date = if ends_at_midnight(start, end) { date.succ_opt()? } else { date };
+    let ends = candidates(zone, end_date, end);
 
     if starts.is_empty() {
         return None;
@@ -218,7 +245,7 @@ fn validate(raw: RawRule, viewing: Tz, diags: &mut Vec<Diagnostic>) -> Option<Ru
         return None;
     };
 
-    if end <= start {
+    if span_length(start, end) <= Duration::zero() {
         warn(diags, &id, format!(
             "Recurrence skipped: end {} is not after start {}",
             crate::clock::time12(end), crate::clock::time12(start)

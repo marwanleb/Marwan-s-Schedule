@@ -128,9 +128,14 @@ function occupiedHours() {
   const used = new Set();
   for (const day of state.week.days) {
     for (const p of day.placements) {
-      const a = new Date(p.starts_at).getHours();
+      const s = new Date(p.starts_at);
+      const a = s.getHours();
       const b = new Date(p.ends_at);
-      const endH = b.getMinutes() > 0 ? b.getHours() : b.getHours() - 1;
+      // A block that runs up to midnight ends at hour 0 of the next date; read
+      // from the clock alone that is "before" it started, and the rows it
+      // covers after its first hour were never drawn.
+      const endH = b.toDateString() !== s.toDateString() ? 23
+        : b.getMinutes() > 0 ? b.getHours() : b.getHours() - 1;
       for (let h = a; h <= Math.max(a, endH); h++) used.add(h);
     }
   }
@@ -172,8 +177,11 @@ function renderWeek() {
   });
 
   const used = occupiedHours();
+  // 7am to 10pm by default, stretched to take in anything earlier or later.
+  // It used to be exactly 7 to 22, and a block outside that was skipped: a 6am
+  // run or an 11:30pm call existed and was never drawn.
   const hours = [];
-  for (let h = 7; h <= 22; h++) hours.push(h);
+  for (let h = Math.min(7, ...used); h <= Math.max(22, ...used); h++) hours.push(h);
 
   // Empty hours give up only as much height as it takes to fit the pane, and
   // never below the floor. All-or-nothing collapsing squeezed a schedule that
@@ -1089,7 +1097,12 @@ function makeBlockDraggable(ev, grip, p, date, hours, heightOf) {
 
       const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
       const starts = rfc(new Date(`${latest.date}T${hhmm(latest.startMin)}:00`));
-      const ends = rfc(new Date(`${latest.date}T${hhmm(Math.min(latest.endMin, 24 * 60 - 1))}:00`));
+      // Up to midnight means the midnight after, on the next date, not 11:59pm.
+      const nextDay = fromIso(latest.date);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const ends = latest.endMin >= 24 * 60
+        ? rfc(new Date(`${iso(nextDay)}T00:00:00`))
+        : rfc(new Date(`${latest.date}T${hhmm(latest.endMin)}:00`));
 
       try {
         if (p.recurs) {

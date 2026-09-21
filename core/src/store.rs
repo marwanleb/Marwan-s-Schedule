@@ -159,7 +159,7 @@ pub fn add_from_text_in(
             // the week; an hour is the least surprising default.
             None => {
                 let a = p.at.unwrap_or_else(|| NaiveTime::from_hms_opt(9, 0, 0).unwrap());
-                (a, a + Duration::hours(1))
+                (a, crate::expand::end_within_day(a, Duration::hours(1)))
             }
         };
         // Fixed by default: the item keeps this zone's clock wherever you go.
@@ -193,12 +193,14 @@ pub fn add_from_text_in(
                     // An estimate is a better guess at how long than an
                     // arbitrary hour, when one was given.
                     let mins = p.estimate_min.unwrap_or(60).clamp(1, 12 * 60) as i64;
-                    (a, a + Duration::minutes(mins))
+                    (a, crate::expand::end_within_day(a, Duration::minutes(mins)))
                 }
             };
+            // A block that runs up to midnight ends on the next date.
+            let end_date = if crate::expand::ends_at_midnight(start, end) { date.succ_opt() } else { Some(date) };
             if let (Some(s), Some(e)) = (
                 local_instant(zone, date, start),
-                local_instant(zone, date, end),
+                end_date.and_then(|d| local_instant(zone, d, end)),
             ) {
                 let _ = add_placement(db, &id, &s.to_rfc3339(), &e.to_rfc3339());
             }
