@@ -3,8 +3,8 @@
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use chrono_tz::America::Chicago;
 use ms_core::{
-    add_from_text_in, already_sent, due_soon, get_days, mark_sent, move_placement, prune_sent,
-    set_done, set_setting, setting, Db, Kind,
+    add_from_text_in, already_sent, due_soon, get_days, mark_sent, move_occurrence,
+    move_placement, prune_sent, set_done, set_setting, setting, Db, Kind,
 };
 
 const LEAD: i64 = 10;
@@ -231,4 +231,33 @@ fn resizing_an_on_block_announces_it_once() {
     let out = soon(&db, "2026-09-09T13:52:00Z");
     assert_eq!(out.len(), 1, "{out:?}");
     assert_eq!(out[0].ends, Some(utc("2026-09-09T15:30:00Z")));
+}
+
+/// A moved occurrence is a real row. Dragging it a second time, to another
+/// day, is a plain move of that row: the grid must not cancel the date it now
+/// sits on and place a fresh copy beside the old one, which is how the bot came
+/// to announce a class twice.
+///
+/// This pins the store contract the grid relies on. Choosing that path lives in
+/// `app/src/main.js` (drag dispatch on `origin`) and is not exercised here.
+#[test]
+fn a_moved_occurrence_dragged_again_is_announced_once() {
+    let db = Db::open_in_memory().unwrap();
+    let item = add(&db, "PHYS201 every wed 10:30-12:00", "2026-09-08", "2026-09-08T12:00:00Z");
+    // Wednesday's class goes to Thursday 2pm...
+    let copy = move_occurrence(
+        &db,
+        &item.id,
+        d("2026-09-09"),
+        "2026-09-10T14:00:00-05:00",
+        "2026-09-10T15:30:00-05:00",
+    )
+    .unwrap();
+    // ...and from there to Thursday 4pm, by its own id.
+    move_placement(&db, &copy, "2026-09-10T16:00:00-05:00", "2026-09-10T17:30:00-05:00").unwrap();
+
+    assert!(soon(&db, "2026-09-09T15:22:00Z").is_empty(), "Wednesday is cancelled");
+    assert!(soon(&db, "2026-09-10T18:52:00Z").is_empty(), "2pm is not where it is");
+    let out = soon(&db, "2026-09-10T20:52:00Z");
+    assert_eq!(out.len(), 1, "once, at 4pm: {out:?}");
 }
