@@ -117,22 +117,21 @@ pub fn add_from_text_in(
     // A due time is a wall clock where you are standing, resolved through the
     // zone and then stored as an instant. Labelling local time as UTC — which
     // this did — puts every deadline out by the offset.
-    let due_at = p.due.and_then(|d| {
-        let t = p
-            .at
-            .unwrap_or_else(|| NaiveTime::from_hms_opt(DEFAULT_DUE.0, DEFAULT_DUE.1, 0).unwrap());
-        let mut when = local_instant(zone, d, t)?;
+    let due_time = p
+        .at
+        .unwrap_or_else(|| NaiveTime::from_hms_opt(DEFAULT_DUE.0, DEFAULT_DUE.1, 0).unwrap());
 
-        // A bare weekday means the next one still to come. Naming today's own
-        // weekday after that hour has passed used to file the item as already
-        // overdue, silently. An explicit date is left alone — it may be
-        // something already missed, deliberately recorded.
-        let from_weekday = !p.repeats && p.byday.len() == 1;
-        if from_weekday && when < now {
-            when = local_instant(zone, d + Duration::days(7), t)?;
-        }
-        Some(when)
+    // A bare weekday means the next one still to come. Naming today's own
+    // weekday after that hour has passed used to file the item as already
+    // overdue, silently. An explicit date is left alone — it may be
+    // something already missed, deliberately recorded. The block below uses
+    // this same date, so the two cannot end up a week apart.
+    let from_weekday = !p.repeats && p.byday.len() == 1;
+    let due_date = p.due.map(|d| {
+        let gone = local_instant(zone, d, due_time).is_some_and(|w| w < now);
+        if from_weekday && gone { d + Duration::days(7) } else { d }
     });
+    let due_at = due_date.and_then(|d| local_instant(zone, d, due_time));
 
     db.conn.execute(
         "INSERT INTO items (id, title, tags, category, location, listed, due_at, estimate_min, created_at, source)
@@ -185,7 +184,7 @@ pub fn add_from_text_in(
     // placement points at this same item — completing or timing it stays
     // connected, unlike a copy. Spec 3.1.
     if p.scheduled {
-        if let Some(date) = p.due {
+        if let Some(date) = due_date {
             let (start, end) = match p.span {
                 Some((a, b)) => (a, b),
                 None => {
