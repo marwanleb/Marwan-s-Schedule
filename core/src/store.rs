@@ -458,6 +458,12 @@ pub fn add_placement_as(
 }
 
 /// Move an existing one-off block.
+///
+/// An item said with "on" has a deadline at the very instant its block starts:
+/// one clause wrote both. If only the block moves, the list still says nine
+/// o'clock and the bot reminds you of a slot nothing is in any more. So a
+/// deadline that sits exactly on the old start goes with it; one anywhere else
+/// was a separate fact and is left alone.
 pub fn move_placement(db: &Db, id: &str, starts_at: &str, ends_at: &str) -> Result<(), String> {
     let (Ok(s), Ok(e)) = (
         DateTime::parse_from_rfc3339(starts_at),
@@ -468,16 +474,33 @@ pub fn move_placement(db: &Db, id: &str, starts_at: &str, ends_at: &str) -> Resu
     if e <= s {
         return Err("a block must end after it starts".into());
     }
-    let n = db
-        .conn
-        .execute(
-            "UPDATE placements SET starts_at = ?2, ends_at = ?3 WHERE id = ?1",
-            rusqlite::params![id, starts_at, ends_at],
+    let Ok((item_id, was)) = db.conn.query_row(
+        "SELECT item_id, starts_at FROM placements WHERE id = ?1",
+        rusqlite::params![id],
+        |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+    ) else {
+        return Err("no such block".into());
+    };
+
+    let tx = db.conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute(
+        "UPDATE placements SET starts_at = ?2, ends_at = ?3 WHERE id = ?1",
+        rusqlite::params![id, starts_at, ends_at],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Compared as instants, not strings: the grid writes a local offset, the
+    // parser wrote UTC, and the same moment reads differently in each.
+    let due = fetch(db, &item_id).and_then(|i| i.due_at);
+    let old_start = DateTime::parse_from_rfc3339(&was).ok().map(|d| d.with_timezone(&Utc));
+    if due.is_some() && due == old_start {
+        tx.execute(
+            "UPDATE items SET due_at = ?2 WHERE id = ?1",
+            rusqlite::params![item_id, s.with_timezone(&Utc).to_rfc3339()],
         )
         .map_err(|e| e.to_string())?;
-    if n == 0 {
-        return Err("no such block".into());
     }
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
 

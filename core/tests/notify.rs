@@ -3,8 +3,8 @@
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use chrono_tz::America::Chicago;
 use ms_core::{
-    add_from_text_in, already_sent, due_soon, mark_sent, prune_sent, set_done, set_setting,
-    setting, Db, Kind,
+    add_from_text_in, already_sent, due_soon, get_days, mark_sent, move_placement, prune_sent,
+    set_done, set_setting, setting, Db, Kind,
 };
 
 const LEAD: i64 = 10;
@@ -174,4 +174,61 @@ fn a_deadline_at_a_different_hour_still_gets_its_own_notice() {
 
     assert_eq!(soon(&db, "2026-09-09T18:52:00Z").len(), 1, "the block");
     assert_eq!(soon(&db, "2026-09-10T03:52:00Z").len(), 1, "the deadline, hours later");
+}
+
+fn block_on(db: &Db, date: &str) -> ms_core::Placement {
+    let week = get_days(db, d(date), Chicago);
+    week.days[0].placements[0].clone()
+}
+
+/// "standup on 09/09 9am" is one thing said once: a block, and a deadline at
+/// the same instant. Dragging the block has to take the deadline with it, or
+/// the bot goes on reminding you of a nine o'clock nothing is at any more.
+#[test]
+fn moving_an_on_block_moves_its_reminder_too() {
+    let db = Db::open_in_memory().unwrap();
+    let item = add(&db, "standup on 09/09/2026 09:00", "2026-09-08", "2026-09-08T12:00:00Z");
+    let p = block_on(&db, "2026-09-09");
+    // Dragged from 9:00 to 11:00 Austin, as the grid writes it.
+    move_placement(&db, &p.id, "2026-09-09T11:00:00-05:00", "2026-09-09T12:00:00-05:00").unwrap();
+
+    let stale = soon(&db, "2026-09-09T13:52:00Z");
+    assert!(stale.is_empty(), "nothing is at nine any more: {stale:?}");
+
+    let out = soon(&db, "2026-09-09T15:52:00Z");
+    assert_eq!(out.len(), 1, "announced once, at the new time: {out:?}");
+    assert_eq!(out[0].kind, Kind::Block);
+    assert_eq!(out[0].at, utc("2026-09-09T16:00:00Z"));
+
+    let due = ms_core::store::fetch(&db, &item.id).unwrap().due_at;
+    assert_eq!(due, Some(utc("2026-09-09T16:00:00Z")), "the deadline followed the block");
+}
+
+/// A deadline that was never the block's start is its own fact, and stays.
+#[test]
+fn moving_a_block_leaves_a_separate_deadline_alone() {
+    let db = Db::open_in_memory().unwrap();
+    let item = add(&db, "essay due 09/09/2026 23:00", "2026-09-08", "2026-09-08T12:00:00Z");
+    ms_core::add_placement(&db, &item.id, "2026-09-09T14:00:00-05:00", "2026-09-09T15:00:00-05:00")
+        .unwrap();
+    let p = block_on(&db, "2026-09-09");
+    move_placement(&db, &p.id, "2026-09-09T16:00:00-05:00", "2026-09-09T17:00:00-05:00").unwrap();
+
+    let due = ms_core::store::fetch(&db, &item.id).unwrap().due_at;
+    assert_eq!(due, Some(utc("2026-09-10T04:00:00Z")), "11pm is still 11pm");
+    assert_eq!(soon(&db, "2026-09-10T03:52:00Z").len(), 1, "and still gets its reminder");
+}
+
+/// Pulling the bottom edge changes when it ends, not when it starts; the one
+/// notice stays where it was.
+#[test]
+fn resizing_an_on_block_announces_it_once() {
+    let db = Db::open_in_memory().unwrap();
+    add(&db, "standup on 09/09/2026 09:00", "2026-09-08", "2026-09-08T12:00:00Z");
+    let p = block_on(&db, "2026-09-09");
+    move_placement(&db, &p.id, "2026-09-09T09:00:00-05:00", "2026-09-09T10:30:00-05:00").unwrap();
+
+    let out = soon(&db, "2026-09-09T13:52:00Z");
+    assert_eq!(out.len(), 1, "{out:?}");
+    assert_eq!(out[0].ends, Some(utc("2026-09-09T15:30:00Z")));
 }
