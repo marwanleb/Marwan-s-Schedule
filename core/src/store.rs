@@ -117,8 +117,13 @@ pub fn add_from_text_in(
     // A due time is a wall clock where you are standing, resolved through the
     // zone and then stored as an instant. Labelling local time as UTC — which
     // this did — puts every deadline out by the offset.
+    //
+    // "on" with a range is due when its block starts. Falling back to the
+    // end-of-day default put a second reminder at 11:59pm, and one that moving
+    // the block could not take with it.
     let due_time = p
         .at
+        .or(p.span.filter(|_| p.scheduled).map(|(start, _)| start))
         .unwrap_or_else(|| NaiveTime::from_hms_opt(DEFAULT_DUE.0, DEFAULT_DUE.1, 0).unwrap());
 
     // A bare weekday means the next one still to come. Naming today's own

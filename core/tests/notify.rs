@@ -176,6 +176,7 @@ fn a_deadline_at_a_different_hour_still_gets_its_own_notice() {
     assert_eq!(soon(&db, "2026-09-10T03:52:00Z").len(), 1, "the deadline, hours later");
 }
 
+/// The block the grid shows for an item on `date`, as the drag handler sees it.
 fn block_on(db: &Db, date: &str) -> ms_core::Placement {
     let week = get_days(db, d(date), Chicago);
     week.days[0].placements[0].clone()
@@ -202,6 +203,27 @@ fn moving_an_on_block_moves_its_reminder_too() {
 
     let due = ms_core::store::fetch(&db, &item.id).unwrap().due_at;
     assert_eq!(due, Some(utc("2026-09-09T16:00:00Z")), "the deadline followed the block");
+}
+
+/// "on" with a range is due when it starts, like "on" with a single time. It
+/// used to fall back to 11:59pm and get a second reminder that night, one
+/// that moving the block could not take with it.
+#[test]
+fn an_on_range_is_announced_once_and_moves_with_its_block() {
+    let db = Db::open_in_memory().unwrap();
+    let item = add(&db, "standup on 09/09/2026 09:00-10:00", "2026-09-08", "2026-09-08T12:00:00Z");
+    let due = ms_core::store::fetch(&db, &item.id).unwrap().due_at;
+    assert_eq!(due, Some(utc("2026-09-09T14:00:00Z")), "due when the block starts");
+
+    let out = soon(&db, "2026-09-09T13:52:00Z");
+    assert_eq!(out.len(), 1, "one notice at nine: {out:?}");
+    assert_eq!(out[0].kind, Kind::Block);
+    assert!(soon(&db, "2026-09-10T04:52:00Z").is_empty(), "nothing at 11:59pm");
+
+    let p = block_on(&db, "2026-09-09");
+    move_placement(&db, &p.id, "2026-09-09T11:00:00-05:00", "2026-09-09T12:00:00-05:00").unwrap();
+    assert!(soon(&db, "2026-09-09T13:52:00Z").is_empty(), "nothing is at nine any more");
+    assert_eq!(soon(&db, "2026-09-09T15:52:00Z").len(), 1, "announced once at eleven");
 }
 
 /// A deadline that was never the block's start is its own fact, and stays.

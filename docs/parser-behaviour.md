@@ -125,7 +125,9 @@ makes it a block and anything else is a task.
 
 `on` says *when something happens*, not that it stops being something to
 finish, so it does both: an hour on the week and a line you can tick off. They
-are one object, so ticking either finishes both.
+are one object, so ticking either finishes both. It is due when its block
+starts, whether that was given as a time or a range, and moving the block moves
+the due time with it.
 
 | input | expected | note |
 |---|---|---|

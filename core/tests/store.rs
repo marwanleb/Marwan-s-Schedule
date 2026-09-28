@@ -327,7 +327,7 @@ fn a_weekday_whose_time_has_passed_means_next_week() {
 #[test]
 fn a_weekday_block_whose_time_has_passed_goes_to_next_week_too() {
     let evening = Chicago.with_ymd_and_hms(2026, 8, 31, 18, 0, 0).unwrap().to_utc();
-    for line in ["standup on mon 10am", "standup on mon 10:00"] {
+    for line in ["standup on mon 10am", "standup on mon 10:00", "standup on mon 10:00-11:00"] {
         let db = Db::open_in_memory().unwrap();
         let item = add_from_text_in(&db, line, today(), evening, Chicago).unwrap();
         let next_monday = NaiveDate::from_ymd_opt(2026, 9, 7).unwrap();
