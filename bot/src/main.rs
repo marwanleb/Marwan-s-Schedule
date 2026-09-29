@@ -11,8 +11,8 @@
 
 use chrono::{DateTime, Duration, Local, Utc};
 use ms_core::{
-    add_from_text, already_sent, due_soon, find_by_prefix, get_items, get_week, help_text,
-    interpret, mark_sent, prune_sent, range12, set_done, set_setting, setting, stats, Command, Db, Filter,
+    add_from_text, already_sent, delete_item, due_soon, find_by_prefix, get_items, get_week, help_text,
+    interpret, mark_sent, prune_sent, range12, restore_last, set_done, set_setting, setting, stats, Command, Db, Filter,
     Kind, ListScope, Notice, time12,
 };
 use std::path::PathBuf;
@@ -430,6 +430,40 @@ fn handle(db: &Db, text: &str) -> String {
             }
         }
 
+        Command::Delete(prefix) => {
+            if prefix.is_empty() {
+                return "delete what? send `delete: <text>`".into();
+            }
+            let matches = find_by_prefix(db, &prefix);
+            match matches.len() {
+                0 => format!("nothing matches {prefix:?}"),
+                1 => {
+                    let item = &matches[0];
+                    match delete_item(db, &item.id, now) {
+                        Ok(_) if item.recurs => {
+                            format!("deleted: {}, every repeat of it\nsend `undo` to bring it back", item.title)
+                        }
+                        Ok(_) => format!("deleted: {}\nsend `undo` to bring it back", item.title),
+                        Err(e) => format!("could not delete: {e}"),
+                    }
+                }
+                _ => {
+                    let mut out = format!("{prefix:?} matches {}:\n", matches.len());
+                    for m in matches.iter().take(10) {
+                        out.push_str(&format!("· {}\n", m.title));
+                    }
+                    out.push_str("\nbe more specific");
+                    out
+                }
+            }
+        }
+
+        Command::Undo => match restore_last(db) {
+            Ok(Some(item)) => format!("back: {}", item.title),
+            Ok(None) => "nothing to undo".into(),
+            Err(e) => format!("could not undo: {e}"),
+        },
+
         Command::Capture(p) => {
             if p.title.trim().is_empty() {
                 return "nothing to add".into();
@@ -560,6 +594,22 @@ mod tests {
 
     fn titles(db: &Db) -> Vec<String> {
         get_items(db, &Filter::default()).into_iter().map(|i| i.title).collect()
+    }
+
+    #[test]
+    fn delete_then_undo() {
+        let db = Db::open_in_memory().unwrap();
+        talk(&db, &["math hw fri 5pm ~2h", "math quiz fri 5pm ~1h"]);
+
+        let said = talk(&db, &["delete: math", "delete: math hw"]);
+        assert!(said[0].contains("be more specific"), "two match: {:?}", said[0]);
+        assert!(said[1].starts_with("deleted: math hw"), "{:?}", said[1]);
+        assert_eq!(titles(&db), vec!["math quiz"]);
+
+        let said = talk(&db, &["undo", "undo"]);
+        assert!(said[0].starts_with("back: math hw"), "{:?}", said[0]);
+        assert_eq!(said[1], "nothing to undo");
+        assert_eq!(titles(&db), vec!["math hw", "math quiz"]);
     }
 
     #[test]

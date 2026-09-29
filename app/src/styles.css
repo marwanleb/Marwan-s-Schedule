@@ -485,6 +485,26 @@ main {
   justify-content: center;
 }
 .play:hover { border-color: var(--gold); color: var(--gold); }
+/* Out of the way until the row is pointed at, so a list of twenty is not
+   twenty red crosses. Still reachable by keyboard. */
+.del {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border: 1px solid var(--line-box);
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+.task:hover .del, .del:focus-visible { opacity: 1; }
+.del:hover { border-color: var(--coral); color: var(--coral); }
 .empty { font-size: 12px; color: var(--faint); padding: 10px 11px; }
 
 .addRow { flex: none; padding: 8px 14px 10px; }
@@ -636,6 +656,31 @@ main {
 .tEst { font-size: 11px; color: var(--dim); }
 .tEst.over { color: var(--coral); }
 .btn.stop { padding: 6px 10px; font-size: 9px; border-color: var(--gold); color: var(--gold-light); }
+
+/* Floats over the page rather than taking a row of the layout, so the
+   panes do not jump when it comes and goes. */
+.toast {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(360px, calc(100vw - 40px));
+  padding: 6px 6px 6px 12px;
+  background: var(--row);
+  border: 1px solid var(--line-box);
+  animation: toastIn .16s var(--ease-row);
+}
+/* Clear of the timer bar when one is running. */
+.timerBar:not([hidden]) ~ .toast { bottom: 88px; }
+.uTitle { min-width: 0; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.undo { flex: none; padding: 4px 8px; font-size: 9px; border-color: transparent; color: var(--coral); }
+.btn.undo:hover { border-color: var(--coral); color: var(--coral); }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 
 /* ── help ───────────────────────────────────────────────────────────── */
 .overlay {

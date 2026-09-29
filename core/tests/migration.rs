@@ -70,6 +70,9 @@ fn an_older_store_opens_and_still_works() {
                    rusqlite::params![added.id], |r| r.get(0)).unwrap();
     assert_eq!(tz.as_deref(), Some("America/Chicago"), "columns added to recurrence too");
 
+    assert!(ms_core::delete_item(&db, &added.id, now()).unwrap(), "and deleting, which needs deleted_at");
+    assert_eq!(get_items(&db, &Filter::default()).len(), 1);
+
     std::fs::remove_file(&path).ok();
 }
 

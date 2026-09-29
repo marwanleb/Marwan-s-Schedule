@@ -1,4 +1,5 @@
 import { rangeHHMM } from "./clock.js";
+import { deleteWithUndo } from "./undo.js";
 /**
  * The item detail sheet: everything you can change about one item without
  * opening a terminal — estimate, whether it shows in the list, whether it
@@ -220,10 +221,7 @@ export async function openDetail(item, occurrenceDate, onChanged) {
   }
   const del = el("button", "wide danger");
   del.textContent = rule ? "DELETE WHOLE SERIES" : "DELETE";
-  del.onclick = async () => {
-    await invoke("cmd_delete", { id: item.id });
-    await refresh();
-  };
+  del.onclick = () => deleteWithUndo(item, refresh);
   acts.append(del);
   body.append(field(rule && occurrenceDate ? "THIS OCCURRENCE" : "", acts, true));
 }
