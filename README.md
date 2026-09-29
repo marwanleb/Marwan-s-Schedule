@@ -68,8 +68,14 @@ sched help                         # syntax
 msbot                              # Telegram capture, needs a token
 ```
 
-All three share one database at `%APPDATA%\com.marwan.schedule\schedule.db`
-(SQLite, WAL). Override with `SCHEDULE_DB`, or `sched --db <path>`.
+All three share one database, `schedule.db` (SQLite, WAL), in the app's data
+folder:
+
+- Windows: `%APPDATA%\com.marwan.schedule\`
+- macOS: `~/Library/Application Support/com.marwan.schedule/`
+- Linux: `~/.local/share/com.marwan.schedule/`
+
+Override with `SCHEDULE_DB`, or `sched --db <path>`.
 
 ## Living in the tray
 
@@ -107,7 +113,7 @@ It needs a token from [@BotFather](https://t.me/BotFather), supplied either way:
 set TELEGRAM_TOKEN=...
 ```
 
-or a line in `%APPDATA%\com.marwan.schedule\bot.toml`:
+or a line in `bot.toml` in that same data folder:
 
 ```toml
 token = "..."

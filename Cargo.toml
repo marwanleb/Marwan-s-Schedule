@@ -16,3 +16,5 @@ uuid = { version = "1", features = ["v4"] }
 clap = { version = "4", features = ["derive"] }
 iana-time-zone = "0.1"
 ureq = { version = "2", features = ["json"] }
+# The same major Tauri uses for app_data_dir, so both resolve the same folder.
+dirs = "6"

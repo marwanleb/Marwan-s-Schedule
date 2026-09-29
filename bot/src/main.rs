@@ -15,7 +15,6 @@ use ms_core::{
     interpret, mark_sent, prune_sent, range12, set_done, set_setting, setting, stats, Command, Db, Filter,
     Kind, ListScope, Notice, time12,
 };
-use std::path::PathBuf;
 
 const API: &str = "https://api.telegram.org/bot";
 /// Long-poll timeout. Telegram holds the connection open until something
@@ -35,7 +34,7 @@ fn token() -> Option<String> {
         }
     }
     // bot.toml sits beside the store and is gitignored.
-    let path = config_dir().join("bot.toml");
+    let path = ms_core::paths::data_dir().join("bot.toml");
     let text = std::fs::read_to_string(path).ok()?;
     for line in text.lines() {
         if let Some(v) = line.trim().strip_prefix("token") {
@@ -46,19 +45,6 @@ fn token() -> Option<String> {
         }
     }
     None
-}
-
-fn config_dir() -> PathBuf {
-    let base = std::env::var("APPDATA")
-        .or_else(|_| std::env::var("HOME"))
-        .unwrap_or_else(|_| ".".into());
-    PathBuf::from(base).join("com.marwan.schedule")
-}
-
-fn db_path() -> PathBuf {
-    std::env::var("SCHEDULE_DB")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| config_dir().join("schedule.db"))
 }
 
 fn local_zone() -> chrono_tz::Tz {
@@ -466,12 +452,12 @@ fn main() {
         eprintln!(
             "msbot: no token.\n\
              Set TELEGRAM_TOKEN, or put `token = \"...\"` in {}",
-            config_dir().join("bot.toml").display()
+            ms_core::paths::data_dir().join("bot.toml").display()
         );
         std::process::exit(1);
     };
 
-    let path = db_path();
+    let path = ms_core::paths::db_path();
     let db = match Db::open(&path) {
         Ok(db) => db,
         Err(e) => {

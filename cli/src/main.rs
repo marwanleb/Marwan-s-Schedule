@@ -72,18 +72,6 @@ enum Cmd {
     Help,
 }
 
-fn default_db() -> PathBuf {
-    // Must match the app's Tauri app_data_dir (APPDATA/<identifier>) and the
-    // bot's, or the three front doors open different stores.
-    if let Ok(explicit) = std::env::var("SCHEDULE_DB") {
-        return PathBuf::from(explicit);
-    }
-    let base = std::env::var("APPDATA")
-        .or_else(|_| std::env::var("HOME"))
-        .unwrap_or_else(|_| ".".into());
-    PathBuf::from(base).join("com.marwan.schedule").join("schedule.db")
-}
-
 fn fail(msg: &str) -> ExitCode {
     eprintln!("sched: {msg}");
     ExitCode::from(1)
@@ -97,7 +85,8 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let path = cli.db.clone().unwrap_or_else(default_db);
+    // The app's own store unless told otherwise, or the front doors drift apart.
+    let path = cli.db.clone().unwrap_or_else(ms_core::paths::db_path);
     let db = match Db::open(&path) {
         Ok(db) => db,
         Err(e) => return fail(&format!("could not open {}: {e}", path.display())),

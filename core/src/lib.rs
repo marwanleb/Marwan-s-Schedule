@@ -7,6 +7,7 @@ pub mod command;
 pub mod compose;
 pub mod import;
 pub mod parse;
+pub mod paths;
 pub mod stats;
 pub mod store;
 pub mod timer;

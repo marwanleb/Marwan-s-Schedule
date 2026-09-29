@@ -7,7 +7,6 @@
 //! Reads `SCHEDULE_DB`, or the same default path the app and the bot use.
 
 use chrono::{DateTime, Duration, Utc};
-use std::path::PathBuf;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -18,12 +17,7 @@ fn main() {
         .map(|d| d.with_timezone(&Utc))
         .unwrap_or_else(Utc::now);
 
-    let path = std::env::var("SCHEDULE_DB").map(PathBuf::from).unwrap_or_else(|_| {
-        let base = std::env::var("APPDATA")
-            .or_else(|_| std::env::var("HOME"))
-            .unwrap_or_else(|_| ".".into());
-        PathBuf::from(base).join("com.marwan.schedule").join("schedule.db")
-    });
+    let path = ms_core::paths::db_path();
 
     let db = match ms_core::Db::open(&path) {
         Ok(db) => db,
