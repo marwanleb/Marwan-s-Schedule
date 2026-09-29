@@ -78,10 +78,16 @@ fn default_db() -> PathBuf {
     if let Ok(explicit) = std::env::var("SCHEDULE_DB") {
         return PathBuf::from(explicit);
     }
-    let base = std::env::var("APPDATA")
-        .or_else(|_| std::env::var("HOME"))
-        .unwrap_or_else(|_| ".".into());
-    PathBuf::from(base).join("com.marwan.schedule").join("schedule.db")
+    let base = PathBuf::from(
+        std::env::var("APPDATA")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_else(|_| ".".into()),
+    );
+    // Tauri's app_data_dir on a Mac. Without this the CLI opened a different
+    // store in the home folder and nothing it wrote reached the window.
+    #[cfg(target_os = "macos")]
+    let base = base.join("Library").join("Application Support");
+    base.join("com.marwan.schedule").join("schedule.db")
 }
 
 fn fail(msg: &str) -> ExitCode {
