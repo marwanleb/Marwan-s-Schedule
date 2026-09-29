@@ -1,5 +1,6 @@
 import { startSky } from "./sky.js";
 import { openDetail, zoneLabel } from "./detail.js";
+import { deleteWithUndo } from "./undo.js";
 import { rangeHHMM, rangeOf, time12 } from "./clock.js";
 
 const invoke = window.__TAURI__.core.invoke;
@@ -528,6 +529,17 @@ function taskRow(item) {
   };
   chips.appendChild(play);
 
+  const del = document.createElement("button");
+  del.className = "del";
+  del.textContent = "×";
+  del.title = item.recurs ? "delete, every repeat" : "delete";
+  del.setAttribute("aria-label", `delete ${item.title}`);
+  del.onclick = (e) => {
+    e.stopPropagation();
+    deleteWithUndo(item, refresh);
+  };
+  chips.appendChild(del);
+
   txt.onclick = () => openDetail(item, null, refresh);
   txt.style.cursor = "pointer";
   txt.title = "click to edit";
@@ -936,8 +948,9 @@ document.addEventListener("keydown", (e) => {
 function makeDraggable(row, item) {
   row.style.touchAction = "none";
   row.addEventListener("pointerdown", (e) => {
-    // The checkbox and the timer control own their own clicks.
-    if (e.target.closest(".box, .play")) return;
+    // The checkbox, the timer control and delete own their own clicks.
+    // Capturing the pointer below would retarget their click to the row.
+    if (e.target.closest(".box, .play, .del")) return;
 
     const startX = e.clientX;
     const startY = e.clientY;

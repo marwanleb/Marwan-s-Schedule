@@ -150,6 +150,7 @@ const session = EMPTY ? null : {
   spent_sec: 2700,
 };
 
+const deleted = new Set();
 window.__calls = [];
 window.__TAURI__ = {
   core: {
@@ -161,7 +162,10 @@ window.__TAURI__ = {
       if (window.__override && window.__override[cmd]) return window.__override[cmd](args);
       switch (cmd) {
         case "cmd_get_week": return weekFrom(args && args.anchor);
-        case "cmd_get_items": return items;
+        case "cmd_get_items": return items.filter((i) => !deleted.has(i.id));
+        // Soft, like the store: the row is kept so undo can bring it back.
+        case "cmd_delete": deleted.add(args.id); return null;
+        case "cmd_restore": deleted.delete(args.id); return null;
         case "cmd_active_session": return session;
         case "cmd_stats": return EMPTY ? { phrase: null, n: 0 } : { phrase: "about a third longer", n: 18 };
         case "cmd_data_version": return 1;
