@@ -2041,6 +2041,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-autostart",
  "tauri-plugin-global-shortcut",
+ "ureq",
 ]
 
 [[package]]
@@ -2112,6 +2113,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "iana-time-zone",
+ "rrule",
  "rusqlite",
  "serde",
  "serde_json",
@@ -2877,6 +2879,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rrule"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "720acfb4980b9d8a6a430f6d7a11933e701ebbeba5eee39cc9d8c5f932aaff74"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "log",
+ "regex",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2980,6 +2995,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "ureq",
 ]
 
 [[package]]

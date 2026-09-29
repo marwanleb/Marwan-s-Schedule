@@ -99,6 +99,18 @@ The bot is separate, because it is a console program: a
 `msbot.vbs` in the Startup folder launches it with no console window. Delete
 that file to stop it.
 
+## Your calendar on the week
+
+```sh
+sched sync-ics "https://outlook.office365.com/owa/calendar/.../calendar.ics"
+```
+
+Paste the ICS link from Outlook (Settings, Calendar, Shared calendars, Publish
+a calendar, "Can view all details") or Google's secret iCal address. The app
+re-reads it every 15 minutes: meetings appear as blocks, moved ones move, and
+cancelled ones leave. Published with "Can view when I'm busy", every block is
+titled Busy. `sched sync-ics --forget` stops it.
+
 ## The Telegram bot
 
 It needs a token from [@BotFather](https://t.me/BotFather), supplied either way:

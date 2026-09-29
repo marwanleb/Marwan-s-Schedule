@@ -75,7 +75,10 @@ occupies the week and stays out of the to-do list.
   stops appearing.
 
 `due_at` is for one-off deadlines and wants a full RFC3339 timestamp including
-the offset. `tags` are free-form; the four that also set a display colour are
+the offset. `starts_at` and `ends_at` (both RFC3339, both or neither, not with
+`repeat`) put a single dated block on the week, like a meeting. Such a record
+stays out of the to-do list, and a re-import moves the block back to where the
+record says. `tags` are free-form; the four that also set a display colour are
 `work`, `life`, `body`, `social`.
 
 The batch applies completely or not at all. A record missing `external_id`, or
@@ -155,6 +158,7 @@ and none of the four traps apply.
     sched except <id> <date>    cancel one occurrence of a repeat
     sched rm <id>               delete
     sched import <file.json>    bulk upsert (see above)
+    sched sync-ics [<url>]      mirror a published calendar; see below
     sched export                every item as JSON
     sched stats [--tag T]       how much longer things take than estimated
     sched help                  syntax reference
@@ -164,6 +168,24 @@ targets a specific store; the default is the app's own.
 
 Exit codes: `0` success, `1` refused (bad input, nothing written), `2` not found
 or ambiguous.
+
+## Calendar feeds
+
+A published calendar (Outlook's "Publish a calendar" ICS link, Google's secret
+iCal address) does not go through an import file. `sched sync-ics <url>` reads
+it, saves the address, and from then on the app re-reads it every 15 minutes.
+
+Every occurrence from a week back to 120 days ahead becomes its own block,
+tagged `calendar`, keyed `ics:<UID>` or `ics:<UID>@<original start>`. Unlike
+`import`, a sync also **deletes**: an `ics:` event that is upcoming and no
+longer in the feed is removed. Past ones are kept. All-day events are skipped.
+One feed at a time; a new address replaces the old.
+
+    sched sync-ics                reuse the saved address
+    sched sync-ics --file x.ics   a downloaded file, not saved
+    sched sync-ics --forget       stop, and remove its upcoming events
+
+Do not hand-write `ics:` records into an import file; the next sync owns them.
 
 ## Capture syntax
 

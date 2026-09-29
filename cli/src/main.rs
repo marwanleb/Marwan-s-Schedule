@@ -61,6 +61,18 @@ enum Cmd {
     Rm { id: String },
     /// Bulk upsert from a JSON file; safe to re-run
     Import { file: PathBuf },
+    /// Mirror a published calendar (an .ics link) onto the week; safe to re-run
+    SyncIcs {
+        /// The feed's address. Remembered, so the app keeps syncing it; omit to
+        /// reuse the saved one
+        url: Option<String>,
+        /// Read a downloaded .ics file instead of fetching
+        #[arg(long, conflicts_with = "url")]
+        file: Option<PathBuf>,
+        /// Forget the saved address and take its upcoming events off the week
+        #[arg(long, conflicts_with_all = ["url", "file"])]
+        forget: bool,
+    },
     /// Dump every item as JSON
     Export,
     /// How much longer things take than estimated
@@ -310,6 +322,69 @@ fn main() -> ExitCode {
                     ExitCode::SUCCESS
                 }
                 Err(e) => fail(&format!("{e}")),
+            }
+        }
+
+        Cmd::SyncIcs { url, file, forget } => {
+            use ms_core::ics;
+            if forget {
+                let _ = db.conn.execute(
+                    "DELETE FROM settings WHERE key = ?1",
+                    rusqlite::params![ics::URL_SETTING],
+                );
+                let from = now - chrono::Duration::days(ics::DAYS_BACK);
+                return match ms_core::sync(&db, ics::PREFIX, &[], from, now) {
+                    Ok(o) => {
+                        println!("forgot the calendar  {} upcoming events removed", o.removed);
+                        ExitCode::SUCCESS
+                    }
+                    Err(e) => fail(&format!("{e}")),
+                };
+            }
+            let text = if let Some(file) = file {
+                match std::fs::read_to_string(&file) {
+                    Ok(t) => t,
+                    Err(e) => return fail(&format!("could not read {}: {e}", file.display())),
+                }
+            } else {
+                let Some(url) = url.or_else(|| ms_core::setting(&db, ics::URL_SETTING)) else {
+                    return fail("no calendar yet: sched sync-ics <link to the .ics feed>");
+                };
+                let body = match ureq::get(&ics::fetchable(&url))
+                    .timeout(std::time::Duration::from_secs(30))
+                    .call()
+                {
+                    Ok(r) => r.into_string(),
+                    Err(e) => return fail(&format!("could not fetch the calendar: {e}")),
+                };
+                match body {
+                    Ok(t) => {
+                        // Saved only once it has answered, so a mistyped link
+                        // is not what the app goes on polling.
+                        if t.contains("BEGIN:VCALENDAR") {
+                            let _ = ms_core::set_setting(&db, ics::URL_SETTING, &url);
+                        }
+                        t
+                    }
+                    Err(e) => return fail(&format!("could not read the calendar: {e}")),
+                }
+            };
+            match ics::sync_text(&db, strip_bom(&text), now, ms_core::local_zone()) {
+                Ok((o, parsed)) => {
+                    for w in &parsed.warnings {
+                        eprintln!("sched: {w}");
+                    }
+                    let skipped = match parsed.skipped_all_day {
+                        0 => String::new(),
+                        n => format!(", {n} all-day skipped"),
+                    };
+                    println!(
+                        "synced  {} added, {} updated, {} removed{skipped}",
+                        o.added, o.updated, o.removed
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => fail(&e),
             }
         }
 
