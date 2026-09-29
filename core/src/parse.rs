@@ -24,9 +24,10 @@ pub struct Parsed {
     pub category: Option<String>,
     pub location: Option<String>,
     pub priority: bool,
-    /// Written with "on": it happens at a time, so it belongs on the week
-    /// rather than in the list. Only set when there is actually a time to
-    /// place it at — otherwise the item would be in neither and vanish.
+    /// Gets a block on the week for its one date. Either written with "on"
+    /// and a time, or a bare range on a date ("appt 1 oct 11:20-12:20"). Only
+    /// set when there is a time and a date to place it at — otherwise the
+    /// item would be in neither the list nor the week and vanish.
     pub scheduled: bool,
     /// True = fixed to the zone it was created in; false = follows the machine.
     /// Defaults to true: a class that drifts to the wrong hour costs more than
@@ -583,7 +584,7 @@ pub fn parse(input: &str, today: NaiveDate) -> Parsed {
     // "on" puts it on the week, but only when there is a time to place it at;
     // otherwise it would be in neither the list nor the schedule. "due" wins,
     // because a deadline is the point of saying it.
-    let scheduled = said_on && !said_due && (at.is_some() || span_at.is_some());
+    let said_on_at = said_on && !said_due && (at.is_some() || span_at.is_some());
 
     // A repeat has no single due date. Otherwise a lone weekday names the next
     // such day; several weekdays without `every` can only mean a repeat, so
@@ -607,6 +608,12 @@ pub fn parse(input: &str, today: NaiveDate) -> Parsed {
         }
     }
 
+    // A bare range on a date is a one-off block on that day. Without this it
+    // was neither listed nor placed, and the range was thrown away for an
+    // 11:59pm deadline nobody could see.
+    let dated_block = !said_due && !repeats && due.is_some() && span_at.is_some();
+    let scheduled = said_on_at || dated_block;
+
     Parsed {
         title,
         consumed,
@@ -622,7 +629,7 @@ pub fn parse(input: &str, today: NaiveDate) -> Parsed {
         // belong in a to-do list. "on" is different: it says when something
         // happens, not that it stops being a thing to finish, so it gets an
         // hour on the week AND stays tickable.
-        listed: span_at.is_none() || scheduled,
+        listed: span_at.is_none() || said_on_at,
         scheduled,
         tags,
         category,

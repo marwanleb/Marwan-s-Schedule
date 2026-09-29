@@ -121,7 +121,9 @@ Recurrence is **stated**, never inferred from the shape of the line.
 ### Task or block
 
 `due` and `on` say which kind of thing this is. Without either, a time **range**
-makes it a block and anything else is a task.
+makes it a block and anything else is a task. A block with a date or one
+weekday goes on the week that day, from its start to its end, and is due when
+it starts.
 
 `on` says *when something happens*, not that it stops being something to
 finish, so it does both: an hour on the week and a line you can tick off. They
@@ -136,6 +138,10 @@ the due time with it.
 | `lab report due wed by 11:59 pm` | listed=true | "due" wins over "by" |
 | `haircut on friday` | listed=true, scheduled=false | no time, so nothing to place |
 | `MATH210 every mon 9:00-10:15` | listed=false | a bare range is a block only |
+| `appt 1 oct 11:20-12:20` | due=2026-10-01, span=11:20-12:20, listed=false, scheduled=true | a block on that one day |
+| `appt 2026-10-01 11:20-12:20` | due=2026-10-01, span=11:20-12:20, scheduled=true | |
+| `appt thu 11:20-12:20p` | due=2026-09-03, span=11:20-12:20, scheduled=true | the next Thursday |
+| `appt on 1 oct 11:20am-12:20pm` | listed=true, scheduled=true | "on" keeps it tickable too |
 | `renew parking` | listed=true | |
 
 ### Everything else

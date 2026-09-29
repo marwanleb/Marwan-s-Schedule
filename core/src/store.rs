@@ -118,7 +118,8 @@ pub fn add_from_text_in(
     // zone and then stored as an instant. Labelling local time as UTC — which
     // this did — puts every deadline out by the offset.
     //
-    // "on" with a range is due when its block starts. Falling back to the
+    // A range placed on a date, with or without "on", is due when its block
+    // starts. Falling back to the
     // end-of-day default put a second reminder at 11:59pm, and one that moving
     // the block could not take with it.
     let due_time = p
@@ -185,7 +186,8 @@ pub fn add_from_text_in(
         )?;
     }
 
-    // "on" means it happens at a time, so give it a block on the week. The
+    // "on", or a bare range on a date, means it happens at a time, so give it
+    // a block on the week. The
     // placement points at this same item — completing or timing it stays
     // connected, unlike a copy. Spec 3.1.
     if p.scheduled {
