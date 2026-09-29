@@ -594,3 +594,41 @@ fn a_trailing_filler_word_is_kept() {
     assert_eq!(parse("lunch at noon monday", today()).title, "lunch");
     assert_eq!(parse("essay due friday", today()).title, "essay");
 }
+
+/// A range on a date places a one-off block there and stays out of the list.
+#[test]
+fn a_bare_range_on_a_date_is_scheduled_not_listed() {
+    let span = Some((
+        chrono::NaiveTime::from_hms_opt(11, 20, 0).unwrap(),
+        chrono::NaiveTime::from_hms_opt(12, 20, 0).unwrap(),
+    ));
+    for (line, due) in [
+        ("Appt 1 oct 11:20-12:20", (2026, 10, 1)),
+        ("Appt 2026-10-01 11:20-12:20", (2026, 10, 1)),
+        ("Appt thu 11:20-12:20p", (2026, 9, 3)),
+    ] {
+        let p = parse(line, today());
+        assert_eq!(p.title, "Appt", "{line}");
+        assert_eq!(p.span, span, "{line}");
+        assert_eq!(p.due, NaiveDate::from_ymd_opt(due.0, due.1, due.2), "{line}");
+        assert!(p.scheduled, "{line}");
+        assert!(!p.listed, "{line}");
+    }
+}
+
+/// "on" with a range still does both: on the week and tickable.
+#[test]
+fn on_with_a_range_is_scheduled_and_listed() {
+    let p = parse("Appt on 1 oct 11:20am-12:20pm", today());
+    assert!(p.scheduled);
+    assert!(p.listed);
+}
+
+/// Only a dated one-off becomes a placed block. A weekly range is a rule, and
+/// "due" says deadline.
+#[test]
+fn a_range_without_a_single_date_is_not_placed() {
+    assert!(!parse("MATH210 every mon 9:00-10:15", today()).scheduled);
+    assert!(!parse("x 9:00-10:15", today()).scheduled);
+    assert!(!parse("essay due fri 9:00-10:15", today()).scheduled);
+}

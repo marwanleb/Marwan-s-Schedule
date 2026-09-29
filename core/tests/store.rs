@@ -436,3 +436,33 @@ fn due_does_not_put_anything_on_the_week() {
     let week = ms_core::get_week(&db, today(), Chicago);
     assert!(week.days.iter().all(|d| d.placements.is_empty()), "a deadline is not a block");
 }
+
+/// A bare range on a date is a one-off block on that day. It used to be
+/// stored with the range dropped, due at 11:59pm, and in neither the list nor
+/// the week.
+#[test]
+fn a_bare_range_on_a_date_is_a_block_on_that_day() {
+    let cases = [
+        ("Appt 1 oct 11:20-12:20", NaiveDate::from_ymd_opt(2026, 10, 1).unwrap()),
+        ("Appt 2026-10-01 11:20-12:20", NaiveDate::from_ymd_opt(2026, 10, 1).unwrap()),
+        ("Appt thu 11:20-12:20p", NaiveDate::from_ymd_opt(2026, 9, 3).unwrap()),
+    ];
+    for (line, date) in cases {
+        let db = Db::open_in_memory().unwrap();
+        let item = add_from_text_in(&db, line, today(), now(), Chicago).unwrap();
+
+        assert_eq!(item.title, "Appt", "{line}");
+        assert!(!item.listed, "a bare range is a block only: {line}");
+        let due = item.due_at.expect("due when the block starts").with_timezone(&Chicago);
+        assert_eq!(due.date_naive(), date, "{line}");
+        assert_eq!(due.format("%H:%M").to_string(), "11:20", "{line}");
+
+        let week = ms_core::get_week(&db, date, Chicago);
+        let day = week.days.iter().find(|d| d.date == date).unwrap();
+        assert_eq!(day.placements.len(), 1, "on the week: {line}");
+        let p = &day.placements[0];
+        assert_eq!(p.item_id, item.id, "{line}");
+        assert_eq!(p.starts_at.format("%H:%M").to_string(), "11:20", "{line}");
+        assert_eq!(p.ends_at.format("%H:%M").to_string(), "12:20", "{line}");
+    }
+}
