@@ -561,6 +561,32 @@ fn toggle_window(app: &tauri::AppHandle) {
     }
 }
 
+/// Keep a subscribed calendar current (see `sched sync-ics`).
+///
+/// Its own connection on its own thread, so a slow fetch never holds the
+/// window's lock. The window notices the writes through its data_version poll,
+/// the same way it notices the CLI. A failed fetch changes nothing and waits
+/// for the next round.
+fn spawn_calendar_sync(path: std::path::PathBuf) {
+    use ms_core::ics;
+    std::thread::spawn(move || loop {
+        if let Ok(db) = Db::open(&path) {
+            if let Some(url) = store::setting(&db, ics::URL_SETTING) {
+                let text = ureq::get(&ics::fetchable(&url))
+                    .timeout(std::time::Duration::from_secs(30))
+                    .call()
+                    .map_err(|e| e.to_string())
+                    .and_then(|r| r.into_string().map_err(|e| e.to_string()));
+                let result = text.and_then(|t| ics::sync_text(&db, &t, Utc::now(), viewing_zone()));
+                if let Err(e) = result {
+                    eprintln!("calendar sync: {e}");
+                }
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_secs(15 * 60));
+    });
+}
+
 pub fn run() {
     use tauri::menu::{Menu, MenuItem};
     use tauri::tray::TrayIconBuilder;
@@ -608,6 +634,7 @@ pub fn run() {
             }
 
             app.manage(AppDb(Mutex::new(db)));
+            spawn_calendar_sync(dir.join("schedule.db"));
 
             let open = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;

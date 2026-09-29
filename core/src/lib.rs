@@ -5,6 +5,7 @@ pub mod notify;
 pub mod clock;
 pub mod command;
 pub mod compose;
+pub mod ics;
 pub mod import;
 pub mod parse;
 pub mod stats;
@@ -16,7 +17,7 @@ pub use db::Db;
 pub use expand::{get_days, get_week};
 pub use command::{help_text, interpret, Command, ListScope};
 pub use compose::{line, Fields, Kind as ComposeKind};
-pub use import::{import, ImportOutcome, ImportRecord, ImportRepeat};
+pub use import::{import, sync, ImportOutcome, ImportRecord, ImportRepeat};
 pub use parse::{parse, Parsed};
 pub use stats::{stats, Stats};
 pub use store::{

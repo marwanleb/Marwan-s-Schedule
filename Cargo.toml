@@ -16,3 +16,4 @@ uuid = { version = "1", features = ["v4"] }
 clap = { version = "4", features = ["derive"] }
 iana-time-zone = "0.1"
 ureq = { version = "2", features = ["json"] }
+rrule = "0.14"

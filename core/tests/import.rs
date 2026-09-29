@@ -12,6 +12,7 @@ fn rec(ext: &str, title: &str) -> ImportRecord {
         tags: vec!["math".into()],
         location: None,
         repeat: None,
+        ..Default::default()
     }
 }
 
@@ -97,6 +98,7 @@ fn a_recurring_class_can_be_imported_and_re_imported() {
             end_time: "12:00".into(),
             tz: Some("America/Chicago".into()),
         }),
+        ..Default::default()
     };
 
     let first = import(&db, std::slice::from_ref(&class), now()).unwrap();
@@ -136,6 +138,7 @@ fn removing_the_repeat_on_re_import_clears_the_rule() {
             byday: vec!["fri".into()], start_time: "15:00".into(),
             end_time: "16:00".into(), tz: None,
         }),
+        ..Default::default()
     };
     import(&db, std::slice::from_ref(&r), now()).unwrap();
     assert!(get_items(&db, &Filter::default())[0].recurs);

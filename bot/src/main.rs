@@ -49,10 +49,15 @@ fn token() -> Option<String> {
 }
 
 fn config_dir() -> PathBuf {
-    let base = std::env::var("APPDATA")
-        .or_else(|_| std::env::var("HOME"))
-        .unwrap_or_else(|_| ".".into());
-    PathBuf::from(base).join("com.marwan.schedule")
+    let base = PathBuf::from(
+        std::env::var("APPDATA")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_else(|_| ".".into()),
+    );
+    // Tauri's app_data_dir on a Mac, so the bot and the window share a store.
+    #[cfg(target_os = "macos")]
+    let base = base.join("Library").join("Application Support");
+    base.join("com.marwan.schedule")
 }
 
 fn db_path() -> PathBuf {
