@@ -6,7 +6,7 @@
 use chrono::{Local, NaiveDate, Utc};
 use clap::{Parser, Subcommand};
 use ms_core::{
-    add_from_text, delete_item, find_by_prefix, get_items, get_week, help_text, import, set_done,
+    add_from_text, delete_item, find_by_prefix, get_items, get_week, help_text, import, restore_item, set_done,
     stats, Db, Filter, ImportRecord,
 };
 use std::path::PathBuf;
@@ -57,8 +57,10 @@ enum Cmd {
     },
     /// Cancel one occurrence of a repeating item
     Except { id: String, date: String },
-    /// Delete an item outright
-    Rm { id: String },
+    /// Delete an item, by id or by the start of its title
+    Rm { text: Vec<String> },
+    /// Bring back a deleted item, by id
+    Restore { id: String },
     /// Bulk upsert from a JSON file; safe to re-run
     Import { file: PathBuf },
     /// Dump every item as JSON
@@ -277,16 +279,47 @@ fn main() -> ExitCode {
             }
         }
 
-        Cmd::Rm { id } => match delete_item(&db, &id, now) {
+        Cmd::Rm { text } => {
+            let text = text.join(" ");
+            // An exact id first, so a script holding ids never hits a title
+            // that happens to start with one.
+            let matches = match ms_core::store::fetch(&db, &text) {
+                Some(item) => vec![item],
+                None if text.trim().is_empty() => Vec::new(),
+                None => find_by_prefix(&db, &text),
+            };
+            match matches.len() {
+                0 => {
+                    eprintln!("sched: no item {text}");
+                    ExitCode::from(2)
+                }
+                1 => match delete_item(&db, &matches[0].id, now) {
+                    Ok(_) => {
+                        println!("removed {}  {}", matches[0].id, matches[0].title);
+                        ExitCode::SUCCESS
+                    }
+                    Err(e) => fail(&format!("could not remove: {e}")),
+                },
+                _ => {
+                    eprintln!("sched: {text:?} matches {} items:", matches.len());
+                    for m in &matches {
+                        eprintln!("  {}  {}", m.id, m.title);
+                    }
+                    ExitCode::from(2)
+                }
+            }
+        }
+
+        Cmd::Restore { id } => match restore_item(&db, &id) {
             Ok(true) => {
-                println!("removed {id}");
+                println!("restored {id}");
                 ExitCode::SUCCESS
             }
             Ok(false) => {
-                eprintln!("sched: no item {id}");
+                eprintln!("sched: nothing deleted with id {id}");
                 ExitCode::from(2)
             }
-            Err(e) => fail(&format!("could not remove: {e}")),
+            Err(e) => fail(&format!("could not restore: {e}")),
         },
 
         Cmd::Import { file } => {

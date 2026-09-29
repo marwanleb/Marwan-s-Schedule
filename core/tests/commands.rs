@@ -18,6 +18,19 @@ fn the_other_commands_are_recognised() {
     assert_eq!(interpret("week", today()), Command::Week);
     assert_eq!(interpret("done: math hw", today()), Command::Done("math hw".into()));
     assert_eq!(interpret("done math hw", today()), Command::Done("math hw".into()));
+    assert_eq!(interpret("undo", today()), Command::Undo);
+}
+
+#[test]
+fn delete_needs_its_colon_or_its_slash() {
+    assert_eq!(interpret("delete: Math HW", today()), Command::Delete("Math HW".into()));
+    assert_eq!(interpret("/delete math hw", today()), Command::Delete("math hw".into()));
+    assert_eq!(interpret("/delete", today()), Command::Delete(String::new()));
+    // Without either, it is a task about deleting something.
+    let Command::Capture(p) = interpret("delete old emails fri", today()) else {
+        panic!("should be a capture");
+    };
+    assert_eq!(p.title, "delete old emails");
 }
 
 #[test]

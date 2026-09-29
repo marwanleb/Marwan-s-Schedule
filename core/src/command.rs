@@ -19,6 +19,10 @@ pub enum Command {
     Week,
     /// Mark done by title prefix.
     Done(String),
+    /// Delete by title prefix.
+    Delete(String),
+    /// Bring back whatever was deleted last.
+    Undo,
     Capture(Parsed),
 }
 
@@ -40,6 +44,7 @@ pub fn interpret(input: &str, today: NaiveDate) -> Command {
         // "week" on its own is the schedule, which is a different question
         // from "what is due this week".
         "week" => return Command::Week,
+        "undo" => return Command::Undo,
         _ => {}
     }
 
@@ -49,6 +54,20 @@ pub fn interpret(input: &str, today: NaiveDate) -> Command {
         if let Some(rest) = lower.strip_prefix(prefix) {
             if rest.starts_with(|c: char| c.is_whitespace()) {
                 return Command::Done(bare[prefix.len()..].trim().to_string());
+            }
+        }
+    }
+
+    // Deleting wants the colon, or the slash form a chat client offers.
+    // Without one, "delete old emails" is a task like any other and must
+    // still be captured.
+    if let Some(rest) = lower.strip_prefix("delete:") {
+        return Command::Delete(bare[bare.len() - rest.len()..].trim().to_string());
+    }
+    if text.starts_with('/') {
+        if let Some(rest) = lower.strip_prefix("delete") {
+            if rest.is_empty() || rest.starts_with(|c: char| c.is_whitespace()) {
+                return Command::Delete(bare[bare.len() - rest.len()..].trim().to_string());
             }
         }
     }
@@ -100,12 +119,14 @@ in the title, so ordinary sentences are safe.
 
 Commands:
 
-  help          this text
-  list          everything still open
-  list today    due today or overdue
-  list week     due in the next seven days
-  week          this week's schedule
-  done: <text>  tick off the first task matching <text>
+  help            this text
+  list            everything still open
+  list today      due today or overdue
+  list week       due in the next seven days
+  week            this week's schedule
+  done: <text>    tick off the first task matching <text>
+  delete: <text>  delete the task matching <text>
+  undo            bring back the last thing deleted
 
 Leave things out and you are asked for them one at a time — when, what
 time, how long — and `-` skips any of them. A complete line is never

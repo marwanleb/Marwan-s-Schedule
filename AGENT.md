@@ -154,7 +154,8 @@ and none of the four traps apply.
     sched week [--on DATE]      the week's schedule
     sched done "<title start>"  tick off; refuses if the prefix is ambiguous
     sched except <id> <date>    cancel one occurrence of a repeat
-    sched rm <id>               delete
+    sched rm <id | title start> delete; refuses if the prefix is ambiguous
+    sched restore <id>          bring a deleted item back
     sched import <file.json>    bulk upsert (see above)
     sched export                every item as JSON
     sched stats [--tag T]       how much longer things take than estimated
@@ -213,12 +214,14 @@ in the title, so ordinary sentences are safe.
 
 Commands:
 
-  help          this text
-  list          everything still open
-  list today    due today or overdue
-  list week     due in the next seven days
-  week          this week's schedule
-  done: <text>  tick off the first task matching <text>
+  help            this text
+  list            everything still open
+  list today      due today or overdue
+  list week       due in the next seven days
+  week            this week's schedule
+  done: <text>    tick off the first task matching <text>
+  delete: <text>  delete the task matching <text>
+  undo            bring back the last thing deleted
 
 Leave things out and you are asked for them one at a time — when, what
 time, how long — and `-` skips any of them. A complete line is never
