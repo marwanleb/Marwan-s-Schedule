@@ -16,7 +16,8 @@ of a second copy of everything.
 
 Re-running an identical import changes nothing. A record whose due date changed
 updates in place. Items Marwan typed himself have no `external_id` and are never
-touched by an import.
+touched by an import. An imported item he deleted stays deleted: re-importing
+it updates the hidden record and does not bring it back.
 
 ## Check before you add
 

@@ -2,6 +2,7 @@ use crate::db::Db;
 use crate::parse::parse;
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
+use rusqlite::OptionalExtension;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Item {
@@ -302,7 +303,7 @@ pub fn fetch(db: &Db, id: &str) -> Option<Item> {
     let mut item = db
         .conn
         .query_row(
-            &format!("SELECT {COLS} FROM items i WHERE i.id = ?1"),
+            &format!("SELECT {COLS} FROM items i WHERE i.id = ?1 AND i.deleted_at IS NULL"),
             rusqlite::params![id],
             row,
         )
@@ -316,7 +317,7 @@ pub fn fetch(db: &Db, id: &str) -> Option<Item> {
 pub fn get_items(db: &Db, filter: &Filter) -> Vec<Item> {
     let Ok(mut stmt) = db
         .conn
-        .prepare(&format!("SELECT {COLS} FROM items i ORDER BY i.created_at"))
+        .prepare(&format!("SELECT {COLS} FROM items i WHERE i.deleted_at IS NULL ORDER BY i.created_at"))
     else {
         return Vec::new();
     };
@@ -369,11 +370,48 @@ pub fn set_done(
     Ok(changed > 0)
 }
 
-pub fn delete_item(db: &Db, id: &str) -> rusqlite::Result<bool> {
-    Ok(db
+/// Take an item off the list and the week. The row stays, marked, so that
+/// `restore_item` can bring it back and a re-import of the same `external_id`
+/// updates it without undeleting it. Time already tracked against it still
+/// counts in `stats`; a timer still running on it is stopped.
+pub fn delete_item(db: &Db, id: &str, now: DateTime<Utc>) -> rusqlite::Result<bool> {
+    let tx = db.conn.unchecked_transaction()?;
+    let at = now.to_rfc3339();
+    let changed = tx.execute(
+        "UPDATE items SET deleted_at = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+        rusqlite::params![id, at],
+    )?;
+    if changed > 0 {
+        tx.execute(
+            "UPDATE sessions SET ended_at = ?2 WHERE item_id = ?1 AND ended_at IS NULL",
+            rusqlite::params![id, at],
+        )?;
+    }
+    tx.commit()?;
+    Ok(changed > 0)
+}
+
+/// Undo `delete_item`. False when there is no such item or it was not deleted.
+pub fn restore_item(db: &Db, id: &str) -> rusqlite::Result<bool> {
+    Ok(db.conn.execute(
+        "UPDATE items SET deleted_at = NULL WHERE id = ?1 AND deleted_at IS NOT NULL",
+        rusqlite::params![id],
+    )? > 0)
+}
+
+/// Restore whatever was deleted most recently, for an `undo` typed to the bot.
+pub fn restore_last(db: &Db) -> rusqlite::Result<Option<Item>> {
+    let last: Option<String> = db
         .conn
-        .execute("DELETE FROM items WHERE id = ?1", rusqlite::params![id])?
-        > 0)
+        .query_row(
+            "SELECT id FROM items WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let Some(id) = last else { return Ok(None) };
+    restore_item(db, &id)?;
+    Ok(fetch(db, &id))
 }
 
 /// First item whose title starts with `prefix`, case-insensitively. Used by the

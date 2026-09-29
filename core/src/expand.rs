@@ -41,7 +41,11 @@ struct Rule {
 fn load_rules(db: &Db, diags: &mut Vec<Diagnostic>) -> Vec<RawRule> {
     let stmt = db
         .conn
-        .prepare("SELECT item_id, byday, start_time, end_time, tz, from_date, until_date, except_on, monthday FROM recurrence");
+        .prepare(
+            "SELECT item_id, byday, start_time, end_time, tz, from_date, until_date, except_on, monthday
+               FROM recurrence
+              WHERE item_id IN (SELECT id FROM items WHERE deleted_at IS NULL)",
+        );
     let mut stmt = match stmt {
         Ok(s) => s,
         Err(e) => {
@@ -359,7 +363,10 @@ struct Stored {
 fn load_placements(db: &Db, viewing: Tz, diags: &mut Vec<Diagnostic>) -> Vec<Stored> {
     let Ok(mut stmt) = db
         .conn
-        .prepare("SELECT id, item_id, starts_at, ends_at, origin, moved_from FROM placements")
+        .prepare(
+            "SELECT id, item_id, starts_at, ends_at, origin, moved_from FROM placements
+              WHERE item_id IN (SELECT id FROM items WHERE deleted_at IS NULL)",
+        )
     else {
         diags.push(Diagnostic {
             level: Level::Warn,

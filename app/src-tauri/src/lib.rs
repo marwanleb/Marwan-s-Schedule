@@ -4,7 +4,7 @@
 use chrono::{Local, NaiveDate, Utc};
 use ms_core::{
     active_session, add_from_text, add_placement, delete_item, delete_placement, get_items,
-    get_days, help_text, move_occurrence, move_placement, restore_occurrence, set_done,
+    get_days, help_text, move_occurrence, move_placement, restore_item, restore_occurrence, set_done,
     set_recurrence_tz, stats, store, set_estimate, set_listed, sweep_stale_sessions, timer_start,
     timer_stop, Db, Filter,
 };
@@ -243,7 +243,14 @@ fn cmd_set_done(
 #[tauri::command]
 fn cmd_delete(state: State<'_, AppDb>, id: String) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    delete_item(&db, &id).map_err(|e| e.to_string())?;
+    delete_item(&db, &id, Utc::now()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn cmd_restore(state: State<'_, AppDb>, id: String) -> Result<(), String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    restore_item(&db, &id).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -692,6 +699,7 @@ pub fn run() {
             cmd_add,
             cmd_set_done,
             cmd_delete,
+            cmd_restore,
             cmd_except,
             cmd_timer_start,
             cmd_timer_stop,

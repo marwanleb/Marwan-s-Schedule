@@ -277,7 +277,7 @@ fn main() -> ExitCode {
             }
         }
 
-        Cmd::Rm { id } => match delete_item(&db, &id) {
+        Cmd::Rm { id } => match delete_item(&db, &id, now) {
             Ok(true) => {
                 println!("removed {id}");
                 ExitCode::SUCCESS

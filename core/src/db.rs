@@ -54,7 +54,10 @@ impl Db {
               created_at   TEXT NOT NULL,
               source       TEXT NOT NULL DEFAULT 'self'
                            CHECK (source IN ('self','import')),
-              external_id  TEXT
+              external_id  TEXT,
+              -- Set instead of removing the row. A deleted import has to stay
+              -- here, or its next re-import would bring it straight back.
+              deleted_at   TEXT
             );
 
 
@@ -147,6 +150,7 @@ impl Db {
             ("items", "estimate_min", "INTEGER"),
             ("items", "source", "TEXT NOT NULL DEFAULT 'self'"),
             ("items", "external_id", "TEXT"),
+            ("items", "deleted_at", "TEXT"),
             ("recurrence", "tz", "TEXT"),
             ("recurrence", "until_date", "TEXT"),
             ("recurrence", "except_on", "TEXT NOT NULL DEFAULT ''"),
