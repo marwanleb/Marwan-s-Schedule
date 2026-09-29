@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use chrono_tz::America::Chicago;
 use chrono_tz::Asia::Beirut;
-use ms_core::{add_from_text, add_from_text_in, get_items, set_done, Db, Filter};
+use ms_core::{add_from_text, add_from_text_in, get_days, get_items, set_done, Db, Filter};
 
 fn today() -> NaiveDate { NaiveDate::from_ymd_opt(2026, 8, 31).unwrap() }
 fn now() -> DateTime<Utc> { Utc.with_ymd_and_hms(2026, 8, 31, 12, 0, 0).unwrap() }
@@ -319,6 +319,31 @@ fn a_weekday_whose_time_has_passed_means_next_week() {
         later.due_at.unwrap().with_timezone(&Chicago).date_naive(),
         NaiveDate::from_ymd_opt(2026, 8, 31).unwrap(),
     );
+}
+
+/// "on" gives the item a block as well as a deadline, and the two are one
+/// thing: when the weekday rolls to next week, the block goes with it rather
+/// than sitting on a slot that has already gone by.
+#[test]
+fn a_weekday_block_whose_time_has_passed_goes_to_next_week_too() {
+    let evening = Chicago.with_ymd_and_hms(2026, 8, 31, 18, 0, 0).unwrap().to_utc();
+    for line in ["standup on mon 10am", "standup on mon 10:00", "standup on mon 10:00-11:00"] {
+        let db = Db::open_in_memory().unwrap();
+        let item = add_from_text_in(&db, line, today(), evening, Chicago).unwrap();
+        let next_monday = NaiveDate::from_ymd_opt(2026, 9, 7).unwrap();
+        assert_eq!(item.due_at.unwrap().with_timezone(&Chicago).date_naive(), next_monday, "{line}");
+
+        let blocks = |from| -> Vec<NaiveDate> {
+            get_days(&db, from, Chicago)
+                .days
+                .into_iter()
+                .filter(|d| !d.placements.is_empty())
+                .map(|d| d.date)
+                .collect()
+        };
+        assert!(blocks(today()).is_empty(), "{line}: nothing left on today");
+        assert_eq!(blocks(next_monday), vec![next_monday], "{line}: the block is next Monday");
+    }
 }
 
 /// An explicit date is taken at its word, even if it is in the past — the user

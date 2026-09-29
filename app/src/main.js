@@ -1105,9 +1105,13 @@ function makeBlockDraggable(ev, grip, p, date, hours, heightOf) {
         : rfc(new Date(`${latest.date}T${hhmm(latest.endMin)}:00`));
 
       try {
-        if (p.recurs) {
+        if (p.recurs && p.origin !== "moved") {
           // A recurring occurrence is generated, not stored: moving it means
           // cancelling that date and placing a real block at the new time.
+          // A copy already moved once is a stored row and takes the plain path
+          // below. Sent through here again it would cancel whatever date it
+          // now sits on and leave the old copy behind, and the bot would
+          // announce both.
           await invoke("cmd_move_occurrence", {
             itemId: p.item_id,
             date,
